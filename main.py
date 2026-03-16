@@ -12,5 +12,5 @@ async def health():
 
 
 @app.post("/intro", response_model=IntroductionResponse, tags=["Introduction"])
-def hello(request: IntroductionRequest):
+def intro(request: IntroductionRequest):
     return IntroductionResponse(message=f"Hello {request.name}, {request.message}")
