@@ -6,14 +6,12 @@ from fastapi import FastAPI
 from src.service.schemas import PredictionRequest, PredictionResponse
 from src.service.utils import EXPECTED_COLS
 
-model_name = "KNN"
-alias = "KNN_knn_bmd_tuned"
-
-model_uri = f"models:/{model_name}@{alias}"
 mlflow.set_tracking_uri("https://mlflow-server-production-c6e7.up.railway.app/")
 
-# Load the model directly for inference
-loaded_model = mlflow.pyfunc.load_model(model_uri)
+model_name = "KNN"
+alias = "KNN_knn_bmd_tuned"
+model_uri = f"models:/{model_name}@{alias}"
+model = mlflow.pyfunc.load_model(model_uri)
 
 app = FastAPI()
 
@@ -28,6 +26,6 @@ async def health():
 def predict(request: PredictionRequest):
     df = pd.DataFrame([request.to_model_input()])
     df = df.reindex(columns=EXPECTED_COLS, fill_value=0)
-    predictions: np.ndarray = loaded_model.predict(df)  # ty: ignore[invalid-assignment]
+    predictions: np.ndarray = model.predict(df)  # ty: ignore[invalid-assignment]
     prediction = "likely" if predictions[0] else "unlikely"
     return PredictionResponse(prediction=prediction)
