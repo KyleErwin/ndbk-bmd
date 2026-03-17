@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CLUSTER_NAME="${KIND_CLUSTER_NAME:-kind}"
+CLUSTER_NAME="ndbk-bmd-cluster"
 
 echo "Checking for kind cluster '${CLUSTER_NAME}'..."
 if kind get clusters 2>/dev/null | grep -qx "${CLUSTER_NAME}"; then

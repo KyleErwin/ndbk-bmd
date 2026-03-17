@@ -1,5 +1,5 @@
 [project]
-name = "k8"
+name = "ndbk-bmd"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -17,10 +17,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "ipykernel>=7.2.0",
-    "ruff>=0.9.0",
-]
+dev = ["ipykernel>=7.2.0", "ruff>=0.9.0"]
 
 [tool.ruff]
 line-length = 88

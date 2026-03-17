@@ -1,11 +1,11 @@
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.ndbk-bmds.io/v1
 kind: Ingress
 metadata:
-  name: k8-app
-  namespace: k8-app
+  name: ndbk-bmd-app
+  namespace: ndbk-bmd-app
   labels:
-    app.kubernetes.io/name: k8-app
-    app.kubernetes.io/part-of: k8
+    app.kubernetes.io/name: ndbk-bmd-app
+    app.kubernetes.io/part-of: ndbk-bmd
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
@@ -17,6 +17,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: k8-app
+                name: ndbk-bmd-app
                 port:
                   number: 80
