@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <rect width="800" height="500" fill="#13141a" />
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b7280" />
+    </marker>
+
+    <style>
+      .card { fill: #1c1d24; stroke: #374151; stroke-width: 1; rx: 8; ry: 8; }
+      .text-title { fill: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 600; }
+      .text-sub { fill: #9ca3af; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; }
+      .status-dot { fill: #10b981; }
+      .status-text { fill: #10b981; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; }
+      .line { stroke: #6b7280; stroke-width: 2; stroke-dasharray: 5,5; fill: none; }
+    </style>
+  </defs>
+
+  <!-- Lines based on screenshot -->
+  <path class="line" d="M 540 120 L 270 120" marker-end="url(#arrow)" />
+  <path class="line" d="M 250 200 L 250 250 L 400 250 L 400 290" marker-end="url(#arrow)" />
+  <path class="line" d="M 590 200 L 590 250 L 540 250 L 540 290" marker-end="url(#arrow)" />
+
+  <!-- app-db -->
+  <g transform="translate(40, 40)">
+    <!-- Main Card Body -->
+    <rect class="card" width="230" height="160" />
+
+    <path d="M 35 30 C 35 25 25 25 25 25 C 25 25 15 25 15 30 L 15 45 C 15 50 25 50 25 50 C 25 50 35 50 35 45 Z" fill="none" stroke="#93c5fd" stroke-width="2"/>
+    <ellipse cx="25" cy="30" rx="10" ry="3" fill="none" stroke="#93c5fd" stroke-width="2"/>
+    <path d="M 15 38 C 15 41 25 41 25 41 C 25 41 35 41 35 38" fill="none" stroke="#93c5fd" stroke-width="2"/>
+
+    <text class="text-title" x="50" y="38">app-db</text>
+
+    <circle class="status-dot" cx="25" cy="90" r="4" />
+    <text class="status-text" x="40" y="94">Online</text>
+
+    <!-- Volume Section -->
+    <line x1="0" y1="120" x2="230" y2="120" stroke="#374151" stroke-width="1" />
+    <path d="M 20 145 H 30 V 135 H 20 Z" fill="none" stroke="#9ca3af" stroke-width="1.5"/>
+    <text class="text-sub" x="40" y="145">postgres-volume</text>
+  </g>
+
+  <!-- mlflow-server -->
+  <g transform="translate(540, 80)">
+    <rect class="card" width="230" height="120" />
+    <path d="M 25 25 L 15 30 L 15 40 L 25 45 L 35 40 L 35 30 Z" fill="none" stroke="#e5e7eb" stroke-width="2"/>
+    <path d="M 15 30 L 25 35 L 35 30 M 25 35 L 25 45" fill="none" stroke="#e5e7eb" stroke-width="2"/>
+
+    <text class="text-title" x="50" y="34">mlflow-server</text>
+    <text class="text-sub" x="50" y="54">mlflow-server-production-c...</text>
+
+    <circle class="status-dot" cx="25" cy="90" r="4" />
+    <text class="status-text" x="40" y="94">Online</text>
+  </g>
+
+  <!-- app -->
+  <g transform="translate(60, 300)">
+    <rect class="card" width="230" height="120" />
+    <path d="M 15 30 L 20 35 L 15 40 M 25 40 L 30 40" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+
+    <text class="text-title" x="50" y="34">app</text>
+    <text class="text-sub" x="50" y="54">app-production-c465.up.rail...</text>
+
+    <circle class="status-dot" cx="25" cy="90" r="4" />
+    <text class="status-text" x="40" y="94">Online</text>
+  </g>
+
+  <!-- ergonomic-wardrobe -->
+  <g transform="translate(385, 300)">
+    <rect class="card" width="230" height="120" />
+    <path d="M 20 35 V 30 C 20 25 30 25 30 30 V 35 M 15 35 H 35 V 45 H 15 Z" fill="none" stroke="#ffffff" stroke-width="2"/>
+
+    <text class="text-title" x="50" y="34">ergonomic-wardrobe</text>
+    <text class="text-sub" x="50" y="94">679.3 MB</text>
+  </g>
+</svg>
