@@ -112,9 +112,8 @@ class BaseTuner(ABC):
             test_auc = roc_auc_score(self.y_test, y_probs)
 
             mlflow.log_params(params)
-            mlflow.log_metric("cv_auc_mean", cv_mean)
+            mlflow.log_metric("cv_average_precision", cv_mean)
             mlflow.log_metric("test_auc", test_auc)
-            mlflow.log_metric("overfit_gap", cv_mean - test_auc)
             mlflow.set_tag("trial_index", self.trial_count)
 
             mlflow.sklearn.log_model(
@@ -147,18 +146,18 @@ class BaseTuner(ABC):
 
             best_trial = study.best_trial
             best_run_id = best_trial.user_attrs["run_id"]
-            best_cv_auc = best_trial.value or 0.0
+            best_cv_ap = best_trial.value or 0.0
 
             self.best_params = study.best_params
 
             if register_best_model:
-                self.register_best_model(best_run_id, best_cv_auc)
+                self.register_best_model(best_run_id, best_cv_ap)
 
             print(f"Experiment {self.experiment_name} Completed")
             print(f"Model {self.model_name}")
             print(f"Best Run ID: {best_run_id}")
             print(f"Best Parameters Found: {best_trial.params}")
-            print(f"Best CV AUC: {best_cv_auc}")
+            print(f"Best CV Average Precision: {best_cv_ap}")
 
     def register_best_model(self, best_run_id: str, cv_auc: float) -> None:
         """Registers the best model from the trials into MLflow Model Registry."""
@@ -339,7 +338,6 @@ class RandomForestTuner(BaseTuner):
         }
 
     def create_pipeline(self, params: Dict[str, Any]) -> Pipeline:
-
         return Pipeline(
             [
                 ("preprocessor", preprocessor),
