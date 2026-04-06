@@ -51,7 +51,20 @@ POUTCOME_OPTIONS = {
     "Unknown": "unknown",
 }
 
-MONTH_OPTIONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTH_OPTIONS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]
 
 with st.form("prediction_form"):
     col_left, col_right = st.columns(2)
@@ -69,11 +82,21 @@ with st.form("prediction_form"):
 
     with col_right:
         st.markdown("#### Campaign Information")
-        previous = st.number_input("Previous number of campaign contacts", min_value=0, value=0)
-        pdays = st.number_input("Days since last contact (-1 = never)", min_value=-1, value=-1)
-        poutcome = st.selectbox("Previous campaign outcome", options=list(POUTCOME_OPTIONS.keys()))
-        month = st.selectbox("Current campaign contact month", options=MONTH_OPTIONS, index=4)
-        contact = st.selectbox("Current campaign contact type", options=list(CONTACT_OPTIONS.keys()))
+        previous = st.number_input(
+            "Previous number of campaign contacts", min_value=0, value=0
+        )
+        pdays = st.number_input(
+            "Days since last contact (-1 = never)", min_value=-1, value=-1
+        )
+        poutcome = st.selectbox(
+            "Previous campaign outcome", options=list(POUTCOME_OPTIONS.keys())
+        )
+        month = st.selectbox(
+            "Current campaign contact month", options=MONTH_OPTIONS, index=4
+        )
+        contact = st.selectbox(
+            "Current campaign contact type", options=list(CONTACT_OPTIONS.keys())
+        )
 
     submitted = st.form_submit_button("Predict")
 

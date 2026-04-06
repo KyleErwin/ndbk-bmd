@@ -9,8 +9,11 @@ from mlflow.client import MlflowClient
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import (average_precision_score, classification_report,
-                             roc_auc_score)
+from sklearn.metrics import (
+    average_precision_score,
+    classification_report,
+    roc_auc_score,
+)
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
@@ -103,7 +106,11 @@ class BaseTuner(ABC):
             pipeline = self.create_pipeline(params)
 
             cv_scores = cross_val_score(
-                pipeline, self.X_train, self.y_train, cv=self.cv, scoring="average_precision"
+                pipeline,
+                self.X_train,
+                self.y_train,
+                cv=self.cv,
+                scoring="average_precision",
             )
             cv_mean = cv_scores.mean()
 
@@ -186,25 +193,31 @@ class BaseTuner(ABC):
 
     def report(self):
         final_model = self.create_pipeline(self.best_params)
-        
+
         final_model.fit(self.X_train, self.y_train)
         y_pred = final_model.predict(self.X_test)
         y_prob = final_model.predict_proba(self.X_test)[:, 1]
 
-        target_names = ['No (0)', 'Yes (1)']
+        target_names = ["No (0)", "Yes (1)"]
 
         print("--- Test Set Results ---")
         print(f"ROC-AUC: {roc_auc_score(self.y_test, y_prob):.4f}")
-        print(f"Average Precision (PR-AUC): {average_precision_score(self.y_test, y_prob):.4f}")
+        print(
+            f"Average Precision (PR-AUC): {average_precision_score(self.y_test, y_prob):.4f}"
+        )
         print("\nClassification Report:")
-        print(classification_report(self.y_test, y_pred,  target_names=target_names))
+        print(classification_report(self.y_test, y_pred, target_names=target_names))
 
         custom_threshold = 0.3
-        y_pred_custom = (final_model.predict_proba(self.X_test)[:, 1] >= custom_threshold).astype(int)
+        y_pred_custom = (
+            final_model.predict_proba(self.X_test)[:, 1] >= custom_threshold
+        ).astype(int)
         print(f"\nClassification Report ({custom_threshold} Threshold):")
-        print(classification_report(self.y_test, y_pred_custom,  target_names=target_names))
+        print(
+            classification_report(self.y_test, y_pred_custom, target_names=target_names)
+        )
 
-        y_random  = np.random.random_sample(y_pred.shape).round().astype(int)
+        y_random = np.random.random_sample(y_pred.shape).round().astype(int)
 
         print("\nClassification Report (Random):")
         print(classification_report(self.y_test, y_random, target_names=target_names))

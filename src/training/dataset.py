@@ -23,9 +23,21 @@ def preprocess_data(filepath):
     for x in ["default", "housing", "loan", "target"]:
         df[x] = df[x].str.strip().str.lower().map({"yes": 1, "no": 0})
 
-    month_map = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 
-                 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}
-    df['month'] = df['month'].str.lower().map(month_map)
+    month_map = {
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "may": 5,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
+    }
+    df["month"] = df["month"].str.lower().map(month_map)
 
     df["was_contacted"] = (df["pdays"] != -1).astype(int)
 
