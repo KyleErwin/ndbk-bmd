@@ -31,11 +31,9 @@ class EducationEnum(str, Enum):
     unknown = "unknown"
 
 
-class PreviouslyContactedEnum(str, Enum):
-    never = "never"
-    within_a_week = "within_a_week"
-    within_a_month = "within_a_month"
-    over_a_month = "over_a_month"
+class ContactEnum(str, Enum):
+    cell = "cell"
+    email = "email"
 
 
 class PreviousCampaignOutcomeEnum(str, Enum):
@@ -59,6 +57,7 @@ class PredictionRequest(BaseModel):
     month: str
     pdays: int = Field(..., ge=-1)
     poutcome: PreviousCampaignOutcomeEnum
+    contact: ContactEnum
 
     def to_model_input(self) -> dict:
         import math
@@ -81,8 +80,9 @@ class PredictionRequest(BaseModel):
             "pdays": self.pdays,
             "previous": self.previous,
             "poutcome": self.poutcome.value,
+            "contact": self.contact.value,
         }
 
 
 class PredictionResponse(BaseModel):
-    prediction: str
+    prediction: float

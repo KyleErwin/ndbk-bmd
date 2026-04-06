@@ -1,19 +1,23 @@
 import argparse
+import os
 import random
 
 import mlflow
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from src.training import KNNTuner, NNTuner, RandomForestTuner
+from src.training import KNNTuner, NNTuner, RandomForestTuner, XGBTuner
 
 SEED = 42
 
 random.seed(SEED)
 np.random.seed(SEED)
 
-mlflow.set_tracking_uri("https://mlflow-server-production-c6e7.up.railway.app/")
+load_dotenv()
+
+mlflow.set_tracking_uri(os.getenv("MLFLOW_URL") or "")
 
 
 def main(args):
@@ -37,17 +41,22 @@ def main(args):
         "cv": cv,
     }
 
-    if args.model in ["knn", "all"]:
-        knn_tuner = KNNTuner(experiment_name="knn_bmd", **kwargs)  # ty: ignore[invalid-argument-type]
-        knn_tuner.tune(max_evals=20, register_best_model=True)
+    if args.model in ["knn"]:
+        tuner = KNNTuner
 
-    if args.model in ["nn", "all"]:
-        nn_tuner = NNTuner(experiment_name="nn_bmd", **kwargs)  # ty: ignore[invalid-argument-type]
-        nn_tuner.tune(max_evals=20, register_best_model=True)
+    if args.model in ["nn"]:
+        tuner = NNTuner
 
-    if args.model in ["rf", "all"]:
-        rf_tuner = RandomForestTuner(experiment_name="rf_bmd", **kwargs)  # ty: ignore[invalid-argument-type]
-        rf_tuner.tune(max_evals=20, register_best_model=True)
+    if args.model in ["rf"]:
+        tuner = RandomForestTuner
+
+    if args.model in ["xgb"]:
+        tuner = XGBTuner
+
+    experiment_name = "BMD_Tuning"
+    tuner = tuner(experiment_name=experiment_name, **kwargs)  # ty: ignore[invalid-argument-type]
+    tuner.tune(n_trials=args.n_trials, register_best_model=args.register_best_model)
+    tuner.report()
 
 
 if __name__ == "__main__":
@@ -56,8 +65,20 @@ if __name__ == "__main__":
         "--model",
         type=str,
         required=True,
-        choices=["knn", "nn", "rf", "all"],
-        help="Model to tune: knn, nn, rf, or all",
+        choices=["knn", "nn", "rf", "xgb"],
+        help="Model to tune: knn, nn, rf, xgb",
+    )
+    parser.add_argument(
+        "--n_trials",
+        type=int,
+        default=30,
+        help="Number of trials for hyperparameter tuning",
+    )
+    parser.add_argument(
+        "--register_best_model",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Whether to register the best model after tuning",
     )
     args = parser.parse_args()
     main(args)

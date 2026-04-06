@@ -3,23 +3,54 @@ from typing import Any, Dict
 
 import mlflow
 import numpy as np
+import optuna
 import pandas as pd
-from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
-from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline
 from mlflow.client import MlflowClient
+from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (average_precision_score, classification_report,
+                             roc_auc_score)
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, RobustScaler
+from xgboost import XGBClassifier
 
 from src.training.utils import get_dvc_hash, get_git_revision_short_hash
 
+preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "num",
+            Pipeline(
+                [
+                    ("imputer", SimpleImputer(strategy="median")),
+                    ("scaler", RobustScaler()),
+                ]
+            ),
+            make_column_selector(dtype_include=np.number),
+        ),
+        (
+            "cat",
+            Pipeline(
+                [
+                    ("imputer", SimpleImputer(strategy="most_frequent")),
+                    (
+                        "ohe",
+                        OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                    ),
+                ]
+            ),
+            make_column_selector(dtype_exclude=np.number),
+        ),
+    ]
+)
+
 
 class BaseTuner(ABC):
-    """Base class for Hyperparameter tuning with Hyperopt and MLflow."""
+    """Base class for Hyperparameter tuning with Optuna and MLflow."""
 
     def __init__(
         self,
@@ -46,7 +77,13 @@ class BaseTuner(ABC):
         exp = mlflow.set_experiment(experiment_name)
         self.experiment_id = exp.experiment_id
         self.trial_count = 0
-        self.space = {}
+
+    @abstractmethod
+    def get_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        """
+        Suggest hyperparameters using optuna trial.
+        """
+        pass
 
     @abstractmethod
     def create_pipeline(self, params: Dict[str, Any]) -> Pipeline:
@@ -55,17 +92,18 @@ class BaseTuner(ABC):
         """
         pass
 
-    def objective(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def objective(self, trial: optuna.Trial) -> float:
         self.trial_count += 1
         run_name = f"{self.model_name}_trial_{self.trial_count}"
 
         with mlflow.start_run(
             run_name=run_name, experiment_id=self.experiment_id, nested=True
         ) as run:
+            params = self.get_params(trial)
             pipeline = self.create_pipeline(params)
 
             cv_scores = cross_val_score(
-                pipeline, self.X_train, self.y_train, cv=self.cv, scoring="roc_auc"
+                pipeline, self.X_train, self.y_train, cv=self.cv, scoring="average_precision"
             )
             cv_mean = cv_scores.mean()
 
@@ -85,31 +123,33 @@ class BaseTuner(ABC):
                 serialization_format="skops",
                 pip_requirements=["scikit-learn", "skops"],
                 skops_trusted_types=[
-                    "imblearn.over_sampling._smote.base.SMOTE",
-                    "imblearn.pipeline.Pipeline",
                     "sklearn.neural_network._stochastic_optimizers.AdamOptimizer",
                     "sklearn.neural_network._stochastic_optimizers.SGDOptimizer",
                     "scipy.sparse._csr.csr_matrix",
+                    "numpy.dtype",
+                    "numpy.number",
+                    "sklearn.compose._column_transformer.make_column_selector",
+                    "xgboost.sklearn.XGBClassifier",
+                    "xgboost.core.Booster",
                 ],
             )
 
-        return {"loss": 1 - cv_mean, "status": STATUS_OK, "run_id": run.info.run_id}
+            # Save the run ID to the trial so we can retrieve it for the best model later
+            trial.set_user_attr("run_id", run.info.run_id)
 
-    def tune(self, max_evals: int = 20, register_best_model: bool = True) -> None:
+        # Optuna maximizes by default if we specify direction="maximize"
+        return cv_mean
+
+    def tune(self, n_trials: int = 30, register_best_model: bool = True) -> None:
         with mlflow.start_run(run_name=f"{self.experiment_name}_parent_run"):
-            trials = Trials()
-            best_params = fmin(
-                fn=self.objective,
-                space=self.space,
-                algo=tpe.suggest,
-                max_evals=max_evals,
-                trials=trials,
-            )
+            study = optuna.create_study(direction="maximize")
+            study.optimize(self.objective, n_trials=n_trials)
 
-            self.trials = trials
-            best_trial = sorted(trials.results, key=lambda x: x["loss"])[0]
-            best_run_id = best_trial["run_id"]
-            best_cv_auc = 1 - best_trial["loss"]
+            best_trial = study.best_trial
+            best_run_id = best_trial.user_attrs["run_id"]
+            best_cv_auc = best_trial.value or 0.0
+
+            self.best_params = study.best_params
 
             if register_best_model:
                 self.register_best_model(best_run_id, best_cv_auc)
@@ -117,7 +157,7 @@ class BaseTuner(ABC):
             print(f"Experiment {self.experiment_name} Completed")
             print(f"Model {self.model_name}")
             print(f"Best Run ID: {best_run_id}")
-            print(f"Best Parameters Found: {best_params}")
+            print(f"Best Parameters Found: {best_trial.params}")
             print(f"Best CV AUC: {best_cv_auc}")
 
     def register_best_model(self, best_run_id: str, cv_auc: float) -> None:
@@ -145,6 +185,31 @@ class BaseTuner(ABC):
             version=mv.version,
         )
 
+    def report(self):
+        final_model = self.create_pipeline(self.best_params)
+        
+        final_model.fit(self.X_train, self.y_train)
+        y_pred = final_model.predict(self.X_test)
+        y_prob = final_model.predict_proba(self.X_test)[:, 1]
+
+        target_names = ['No (0)', 'Yes (1)']
+
+        print("--- Test Set Results ---")
+        print(f"ROC-AUC: {roc_auc_score(self.y_test, y_prob):.4f}")
+        print(f"Average Precision (PR-AUC): {average_precision_score(self.y_test, y_prob):.4f}")
+        print("\nClassification Report:")
+        print(classification_report(self.y_test, y_pred,  target_names=target_names))
+
+        custom_threshold = 0.3
+        y_pred_custom = (final_model.predict_proba(self.X_test)[:, 1] >= custom_threshold).astype(int)
+        print(f"\nClassification Report ({custom_threshold} Threshold):")
+        print(classification_report(self.y_test, y_pred_custom,  target_names=target_names))
+
+        y_random  = np.random.random_sample(y_pred.shape).round().astype(int)
+
+        print("\nClassification Report (Random):")
+        print(classification_report(self.y_test, y_random, target_names=target_names))
+
 
 class KNNTuner(BaseTuner):
     def __init__(
@@ -158,18 +223,23 @@ class KNNTuner(BaseTuner):
         **kwargs,
     ) -> None:
         super().__init__("KNN", experiment_name, X_train, y_train, X_test, y_test, cv)
-        self.space = {
-            "n_neighbors": hp.choice("n_neighbors", range(3, 8)),  # Test 3 to 8
-            "weights": hp.choice("weights", ["uniform", "distance"]),
-            "metric": hp.choice("metric", ["euclidean", "manhattan", "minkowski"]),
-            "p": hp.uniform("p", 1, 2),  # 1 is Manhattan, 2 is Euclidean
+
+    def get_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        return {
+            "n_neighbors": trial.suggest_int("n_neighbors", 3, 30),
+            "weights": trial.suggest_categorical("weights", ["uniform", "distance"]),
+            "metric": trial.suggest_categorical(
+                "metric", ["euclidean", "manhattan", "minkowski"]
+            ),
+            "p": trial.suggest_float("p", 1.0, 2.0),
+            "leaf_size": trial.suggest_categorical("leaf_size", [10, 20, 30, 40, 50]),
         }
 
     def create_pipeline(self, params: Dict[str, Any]) -> Pipeline:
+
         return Pipeline(
             [
-                ("smote", SMOTE(random_state=42)),
-                ("scaler", StandardScaler(with_mean=False)),
+                ("preprocessor", preprocessor),
                 (
                     "classifier",
                     KNeighborsClassifier(
@@ -177,6 +247,7 @@ class KNNTuner(BaseTuner):
                         weights=params["weights"],
                         metric=params["metric"],
                         p=params.get("p", 2),
+                        leaf_size=params["leaf_size"],
                     ),
                 ),
             ]
@@ -197,30 +268,43 @@ class NNTuner(BaseTuner):
         super().__init__(
             "NeuralNetwork", experiment_name, X_train, y_train, X_test, y_test, cv
         )
-        self.space = {
-            "hidden_layer_sizes": hp.choice(
-                "hidden_layer_sizes", [(50,), (100,), (50, 50), (100, 50)]
+
+    def get_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        return {
+            "hidden_layer_sizes": trial.suggest_categorical(
+                "hidden_layer_sizes",
+                ["8", "16_8", "8_16_8"],
             ),
-            "activation": hp.choice("activation", ["tanh", "relu"]),
-            "solver": hp.choice("solver", ["sgd", "adam"]),
-            "alpha": hp.loguniform("alpha", np.log(0.0001), np.log(0.05)),
-            "learning_rate": hp.choice("learning_rate", ["constant", "adaptive"]),
+            "activation": trial.suggest_categorical("activation", ["tanh", "relu"]),
+            "solver": trial.suggest_categorical("solver", ["sgd", "adam"]),
+            "alpha": trial.suggest_float("alpha", 0.0001, 0.05, log=True),
+            "learning_rate": trial.suggest_categorical(
+                "learning_rate", ["constant", "adaptive"]
+            ),
+            "learning_rate_init": trial.suggest_float(
+                "learning_rate_init", 0.0001, 0.01, log=True
+            ),
+            "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128, 256]),
         }
 
     def create_pipeline(self, params: Dict[str, Any]) -> Pipeline:
+
+        hls_tuple = tuple(int(x) for x in params["hidden_layer_sizes"].split("_"))
+
         return Pipeline(
             [
-                ("smote", SMOTE(random_state=42)),
-                ("scaler", StandardScaler(with_mean=False)),
+                ("preprocessor", preprocessor),
                 (
                     "classifier",
                     MLPClassifier(
-                        hidden_layer_sizes=params["hidden_layer_sizes"],
+                        hidden_layer_sizes=hls_tuple,
                         activation=params["activation"],
                         solver=params["solver"],
                         alpha=params["alpha"],
                         learning_rate=params["learning_rate"],
-                        max_iter=500,
+                        learning_rate_init=params["learning_rate_init"],
+                        batch_size=params["batch_size"],
+                        max_iter=1000,
                         random_state=42,
                     ),
                 ),
@@ -242,17 +326,23 @@ class RandomForestTuner(BaseTuner):
         super().__init__(
             "RandomForest", experiment_name, X_train, y_train, X_test, y_test, cv
         )
-        self.space = {
-            "n_estimators": hp.choice("n_estimators", [50, 100, 200]),
-            "max_depth": hp.choice("max_depth", [None, 10, 20, 30]),
-            "min_samples_split": hp.choice("min_samples_split", [2, 5, 10]),
-            "min_samples_leaf": hp.choice("min_samples_leaf", [1, 2, 4]),
+
+    def get_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        return {
+            "n_estimators": trial.suggest_int("n_estimators", 100, 800),
+            "max_depth": trial.suggest_int("max_depth", 4, 10),
+            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
+            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 10),
+            "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2"]),
+            "weight_multiplier": trial.suggest_float("weight_multiplier", 1.0, 8.0),
+            "criterion": trial.suggest_categorical("criterion", ["gini", "entropy"]),
         }
 
     def create_pipeline(self, params: Dict[str, Any]) -> Pipeline:
+
         return Pipeline(
             [
-                ("smote", SMOTE(random_state=42)),
+                ("preprocessor", preprocessor),
                 (
                     "classifier",
                     RandomForestClassifier(
@@ -260,6 +350,60 @@ class RandomForestTuner(BaseTuner):
                         max_depth=params["max_depth"],
                         min_samples_split=params["min_samples_split"],
                         min_samples_leaf=params["min_samples_leaf"],
+                        max_features=params["max_features"],
+                        class_weight={0: 1, 1: params["weight_multiplier"]},
+                        random_state=42,
+                        n_jobs=-1,
+                    ),
+                ),
+            ]
+        )
+
+
+class XGBTuner(BaseTuner):
+    def __init__(
+        self,
+        experiment_name: str,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        X_test: pd.DataFrame,
+        y_test: pd.Series,
+        cv: StratifiedKFold,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            "XGBoost", experiment_name, X_train, y_train, X_test, y_test, cv
+        )
+
+    def get_params(self, trial: optuna.Trial) -> Dict[str, Any]:
+        return {
+            "n_estimators": trial.suggest_int("n_estimators", 100, 1000, step=100),
+            "max_depth": trial.suggest_int("max_depth", 3, 15),
+            "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+            "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "gamma": trial.suggest_float("gamma", 1e-8, 1.0, log=True),
+            "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+            "scale_pos_weight": trial.suggest_float("scale_pos_weight", 1.0, 10.0),
+        }
+
+    def create_pipeline(self, params: Dict[str, Any]) -> Pipeline:
+
+        return Pipeline(
+            [
+                ("preprocessor", preprocessor),
+                (
+                    "classifier",
+                    XGBClassifier(
+                        n_estimators=params["n_estimators"],
+                        max_depth=params["max_depth"],
+                        learning_rate=params["learning_rate"],
+                        subsample=params["subsample"],
+                        colsample_bytree=params["colsample_bytree"],
+                        gamma=params["gamma"],
+                        min_child_weight=params["min_child_weight"],
+                        scale_pos_weight=params["scale_pos_weight"],
+                        eval_metric="logloss",
                         random_state=42,
                     ),
                 ),

@@ -1,3 +1,3 @@
-from src.training.tuner import KNNTuner, NNTuner, RandomForestTuner
+from src.training.tuner import KNNTuner, NNTuner, RandomForestTuner, XGBTuner
 
-__all__ = ["KNNTuner", "NNTuner", "RandomForestTuner"]
+__all__ = ["KNNTuner", "NNTuner", "RandomForestTuner", "XGBTuner"]
