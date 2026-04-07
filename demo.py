@@ -1,5 +1,5 @@
-import streamlit as st
 import requests
+import streamlit as st
 
 st.set_page_config(page_title="Bank Marketing")
 st.title("Bank Marketing")
@@ -111,7 +111,7 @@ if submitted:
         "poutcome": POUTCOME_OPTIONS[poutcome],
     }
 
-    API_URL = "https://mlflow-server-production-c6e7.up.railway.app/"
+    API_URL = "https://app-production-c465.up.railway.app"
 
     with st.spinner("Getting prediction..."):
         try:

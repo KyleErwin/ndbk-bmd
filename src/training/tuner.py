@@ -18,7 +18,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, RobustScaler
+from sklearn.preprocessing import OneHotEncoder, RobustScaler
 from xgboost import XGBClassifier
 
 from src.training.utils import get_dvc_hash, get_git_revision_short_hash
@@ -140,10 +140,8 @@ class BaseTuner(ABC):
                 ],
             )
 
-            # Save the run ID to the trial so we can retrieve it for the best model later
             trial.set_user_attr("run_id", run.info.run_id)
 
-        # Optuna maximizes by default if we specify direction="maximize"
         return cv_mean
 
     def tune(self, n_trials: int = 30, register_best_model: bool = True) -> None:
@@ -201,10 +199,10 @@ class BaseTuner(ABC):
         target_names = ["No (0)", "Yes (1)"]
 
         print("--- Test Set Results ---")
-        print(f"ROC-AUC: {roc_auc_score(self.y_test, y_prob):.4f}")
-        print(
-            f"Average Precision (PR-AUC): {average_precision_score(self.y_test, y_prob):.4f}"
-        )
+        ap_score = average_precision_score(self.y_test, y_prob)
+        auc_score = roc_auc_score(self.y_test, y_prob)
+        print(f"ROC-AUC: {auc_score:.4f}")
+        print(f"Average Precision (PR-AUC): {ap_score:.4f}")
         print("\nClassification Report:")
         print(classification_report(self.y_test, y_pred, target_names=target_names))
 

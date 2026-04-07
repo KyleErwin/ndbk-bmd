@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/version: "1.7.0"
     app.kubernetes.io/part-of: ndbk-bmd
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: ndbk-bmd-app

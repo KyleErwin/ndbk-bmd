@@ -5,7 +5,6 @@ from fastapi import FastAPI
 
 from src.service.schemas import PredictionRequest, PredictionResponse
 
-
 mlflow.set_tracking_uri("https://mlflow-server-production-c6e7.up.railway.app/")
 
 model_name = "RandomForest"
